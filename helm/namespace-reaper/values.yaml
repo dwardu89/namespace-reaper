@@ -16,6 +16,8 @@ env:
     value: "info"
   - name: CHECK_INTERVAL
     value: "60"
+  - name: EXCLUDED_NAMESPACES
+    value: "kube-node-lease,kube-public,kube-system"
   # Only use this if you are pointing to another cluster
   # - name: CHECK_INTERVAL
   #   value: "<path-to-kube-config>"

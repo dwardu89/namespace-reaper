@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ const dateUpdatedLabel string = "namespace-reaper.dwardu.com/date-updated"
 var expiresInHours float64 = 8
 var gracePeriodSeconds int64 = 600 // 10 minutes gracePeriod
 var checkInterval uint64 = 60
+var excludedNamespaces []string = []string{"kube-node-lease", "kube-public", "kube-system"}
 
 // Determine whether you are running inside or outside of a cluster.
 func getConfiguration(kubeConfigPath string) (*rest.Config, error) {
@@ -102,6 +104,8 @@ func init() {
 	checkIntervalEnv := getEnv("CHECK_INTERVAL", "60")
 	checkInterval, _ = strconv.ParseUint(checkIntervalEnv, 10, 64)
 
+	excludedNamespacesEnv := getEnv("EXCLUDED_NAMESPACES", "kube-node-lease,kube-public,kube-system")
+	excludedNamespaces = strings.Split(excludedNamespacesEnv, ",")
 }
 
 func main() {
@@ -175,7 +179,7 @@ func deleteNamespace(clientset *kubernetes.Clientset, namespace v1.Namespace) {
 	}
 	log.WithFields(log.Fields{
 		"namespace": namespace.Name,
-	}).Infof("Namespace [%s] has been deleted.", namespace.Name)
+	}).Infof("Namespace [%s] has been marked for deletion.", namespace.Name)
 }
 
 func isNamespaceExpired(namespace v1.Namespace) bool {
@@ -199,18 +203,37 @@ func isNamespaceExpired(namespace v1.Namespace) bool {
 				"namespace": namespace.Name,
 				"eternal":   false,
 				"expired":   isExpired,
-			}).Infof("Namespace [%s] is still valid? [%t].", namespace.Name, !isExpired)
+			}).Debugf("Namespace [%s] is still valid? [%t].", namespace.Name, !isExpired)
 
 			return isExpired
 		}
 	}
+	log.WithFields(log.Fields{
+		"namespace": namespace.Name,
+	}).Debugf("Namespace [%s] doesnt have reaping annotation. It will be ignored.", namespace.Name)
+	return false
+}
 
+func isNotExcluded(namespace v1.Namespace) bool {
+	for _, excludedNamespace := range excludedNamespaces {
+		if excludedNamespace == namespace.Name {
+			log.WithFields(log.Fields{
+				"namespace":          namespace.Name,
+				"excludedNamespaces": excludedNamespaces,
+			}).Debugf("Namespace [%s] is excluded from reaping.", namespace.Name)
+			return true
+		}
+	}
+	log.WithFields(log.Fields{
+		"namespace":          namespace.Name,
+		"excludedNamespaces": excludedNamespaces,
+	}).Debugf("Namespace [%s] is not excluded from reaping.", namespace.Name)
 	return false
 }
 
 func cleanupNamespaces(clientset *kubernetes.Clientset, namespaces []v1.Namespace) {
 	for _, namespace := range namespaces {
-		if isNamespaceExpired(namespace) {
+		if isNotExcluded(namespace) && isNamespaceExpired(namespace) {
 			deleteNamespace(clientset, namespace)
 		}
 	}
