@@ -47,6 +47,39 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+func markReady() {
+	f, err := os.Create("/tmp/namespace-reaper-ready")
+
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":           err,
+			"error_message": err.Error(),
+		}).Panic("Error creating ready file.")
+	}
+	defer f.Close()
+}
+
+func cleanLive() {
+	err := os.Remove("/tmp/namespace-reaper-live")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":           err,
+			"error_message": err.Error(),
+		}).Panic("Error removing liveness file.")
+	}
+}
+
+func markLive() {
+	f, err := os.Create("/tmp/namespace-reaper-live")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":           err,
+			"error_message": err.Error(),
+		}).Panic("Error creating ready file.")
+	}
+	defer f.Close()
+}
+
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	log.SetFormatter(&log.JSONFormatter{})
@@ -91,10 +124,13 @@ func main() {
 		}).Panic("Error loading kube config from in cluster config.")
 	}
 
+	markReady()
 	for {
 		namespaces := getNamespaces(clientset)
 		cleanupNamespaces(clientset, namespaces)
+		markLive()
 		time.Sleep(time.Duration(checkInterval) * time.Second)
+		cleanLive()
 	}
 }
 
