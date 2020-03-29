@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -12,12 +13,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const expiryLabel string = "dwardu.com/namespace-reaper/expires-in-hours"
-const reapingLabel string = "dwardu.com/namespace-reaper/reap"
-const dateUpdatedLabel string = "dwardu.com/namespace-reaper/date-updated"
+const expiryLabel string = "namespace-reaper.dwardu.com/expires-in-hours"
+const reapingLabel string = "namespace-reaper.dwardu.com/reap"
+const dateUpdatedLabel string = "namespace-reaper.dwardu.com/date-updated"
 
-var expiresInHours int = 8
-var gracePeriodSeconds int64 = 600 // 5 minutes grace period
+var expiresInHours float64 = 8
+var gracePeriodSeconds int64 = 600 // 10 minutes gracePeriod
+var checkInterval uint64 = 60
 
 // Determine whether you are running inside or outside of a cluster.
 func getConfiguration(kubeConfigPath string) (*rest.Config, error) {
@@ -63,6 +65,10 @@ func init() {
 		logLevel = log.InfoLevel
 	}
 	log.SetLevel(logLevel)
+
+	checkIntervalEnv := getEnv("CHECK_INTERVAL", "60")
+	checkInterval, _ = strconv.ParseUint(checkIntervalEnv, 10, 64)
+
 }
 
 func main() {
@@ -88,7 +94,7 @@ func main() {
 	for {
 		namespaces := getNamespaces(clientset)
 		cleanupNamespaces(clientset, namespaces)
-		time.Sleep(10 * time.Second)
+		time.Sleep(time.Duration(checkInterval) * time.Second)
 	}
 }
 
@@ -97,7 +103,7 @@ func getNamespaces(clientset *kubernetes.Clientset) []v1.Namespace {
 
 	log.WithFields(log.Fields{
 		"namespaces_count": len(namespaces.Items),
-	}).Infof("There are %d namespaces in the cluster\n", len(namespaces.Items))
+	}).Infof("There are %d namespaces in the cluster", len(namespaces.Items))
 
 	if err != nil {
 		panic(err.Error())
@@ -105,19 +111,19 @@ func getNamespaces(clientset *kubernetes.Clientset) []v1.Namespace {
 	return namespaces.Items
 }
 
-func describeNamespace(namespace v1.Namespace) {
-	if validUntil, ok := namespace.Annotations["namespace-reaper/valid-until"]; ok {
-		log.WithFields(log.Fields{
-			"namespace": namespace.Name,
-			"eternal":   true,
-		}).Infof("Namespace %s is Valid until %s.\n", namespace.Name, validUntil)
-	} else {
-		log.WithFields(log.Fields{
-			"namespace": namespace.Name,
-			"eternal":   true,
-		}).Tracef("Namespace %s is Eternal.\n", namespace.Name)
-	}
-}
+// func describeNamespace(namespace v1.Namespace) {
+// 	if validUntil, ok := namespace.Annotations["namespace-reaper/valid-until"]; ok {
+// 		log.WithFields(log.Fields{
+// 			"namespace": namespace.Name,
+// 			"eternal":   true,
+// 		}).Infof("Namespace %s is Valid until %s.", namespace.Name, validUntil)
+// 	} else {
+// 		log.WithFields(log.Fields{
+// 			"namespace": namespace.Name,
+// 			"eternal":   true,
+// 		}).Tracef("Namespace %s is Eternal.", namespace.Name)
+// 	}
+// }
 
 func deleteNamespace(clientset *kubernetes.Clientset, namespace v1.Namespace) {
 	deletePolicy := metav1.DeletePropagationBackground
@@ -125,7 +131,7 @@ func deleteNamespace(clientset *kubernetes.Clientset, namespace v1.Namespace) {
 		&metav1.DeleteOptions{
 			PropagationPolicy:  &deletePolicy,
 			GracePeriodSeconds: &gracePeriodSeconds,
-			DryRun:             []string{metav1.DryRunAll}}); err != nil {
+			DryRun:             []string{}}); err != nil {
 		log.WithFields(log.Fields{
 			"err":           err,
 			"error_message": err.Error(),
@@ -133,7 +139,6 @@ func deleteNamespace(clientset *kubernetes.Clientset, namespace v1.Namespace) {
 	}
 	log.WithFields(log.Fields{
 		"namespace": namespace.Name,
-		"eternal":   true,
 	}).Infof("Namespace [%s] has been deleted.", namespace.Name)
 }
 
@@ -144,8 +149,24 @@ func isNamespaceExpired(namespace v1.Namespace) bool {
 	reapingAnnotation := annotations[reapingLabel]
 
 	if len(reapingAnnotation) > 0 {
-		namespaceAge := now.Sub(namespace.CreationTimestamp.Time)
-		return namespaceAge.Hours() > 8
+		reap, err := strconv.ParseBool(reapingAnnotation)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"err":           err,
+				"error_message": err.Error(),
+			}).Panicf("Reaping Annotation value is malformed, it should be true/false. Actual Value [%s].", reapingAnnotation)
+		}
+		if reap {
+			namespaceAge := now.Sub(namespace.CreationTimestamp.Time)
+			isExpired := (namespaceAge.Hours() > expiresInHours)
+			log.WithFields(log.Fields{
+				"namespace": namespace.Name,
+				"eternal":   false,
+				"expired":   isExpired,
+			}).Infof("Namespace [%s] is still valid? [%t].", namespace.Name, !isExpired)
+
+			return isExpired
+		}
 	}
 
 	return false
