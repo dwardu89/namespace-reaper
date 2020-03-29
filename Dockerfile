@@ -1,5 +1,5 @@
 FROM golang:1.14-alpine
 
-COPY namespace-reaper /namespace-reaper
+COPY bin/namespace-reaper /namespace-reaper
 
 CMD [ "/namespace-reaper" ]

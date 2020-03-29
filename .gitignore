@@ -71,6 +71,8 @@ $RECYCLE.BIN/
 *.cab
 *.msi
 *.msix
+n
+
 *.msm
 *.msp
 
@@ -78,6 +80,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.gitignore.io/api/go,macOS,Windows
-n
-
-namespace-reaper
+bin/

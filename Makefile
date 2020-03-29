@@ -11,7 +11,7 @@ deploy-minikube: build-minikube
 	kubectl apply -f minikube-pod.yaml
 
 build:
-	@GOOS=linux GOARCH=amd64 go build ./cmd/namespace-reaper
+	@GOOS=linux GOARCH=amd64 go build -o bin/ ./cmd/namespace-reaper 
 
 build-docker: deps build
 	docker build . -t dwardu/namespace-reaper
