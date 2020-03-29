@@ -16,9 +16,11 @@ build:
 build-docker: deps build
 	docker build . -t dwardu/namespace-reaper
 
+push: build-docker
+	docker push dwardu/namespace-reaper:latest
+
 deps:
 	go mod tidy
 
 clean:
 	rm namespace-reaper
-	
