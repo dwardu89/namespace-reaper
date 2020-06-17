@@ -1,4 +1,4 @@
-module github.com/dwardu89/k8s-namespace-reaper
+module github.com/dwardu89/namespace-reaper
 
 go 1.14
 
