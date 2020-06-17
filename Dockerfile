@@ -1,4 +1,4 @@
-FROM golang:1.14-alpine
+FROM golang:1.13-alpine
 
 COPY bin/namespace-reaper /namespace-reaper
 

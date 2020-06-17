@@ -5,7 +5,7 @@ export VERSION=0.1.0
 all: deps build build-docker clean
 
 build:
-	@GOOS=linux GOARCH=amd64 go build -o bin/ ./cmd/namespace-reaper 
+	@GOOS=linux GOARCH=amd64 go build -o bin/namespace-reaper ./cmd/namespace-reaper 
 
 build-docker: deps build
 	docker build . -t dwardu/namespace-reaper:$(VERSION)

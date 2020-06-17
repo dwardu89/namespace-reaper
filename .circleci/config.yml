@@ -7,6 +7,8 @@ jobs:
     docker:
       # specify the version
       - image: circleci/golang:1.13
+        environment:
+          GO111MODULE: "on"
 
     #### TEMPLATE_NOTE: go expects specific checkout path representing url
     #### expecting it in the form of
@@ -17,5 +19,11 @@ jobs:
       - checkout
 
       - run: 
-          name: Building image
-          command: make all
+          name: Building binary
+          command: make build
+      
+      - setup_remote_docker
+
+      - run: 
+          name: Building Docker Image
+          command: docker build . -t dwardu/namespace-reaper:$CIRCLE_BRANCH
