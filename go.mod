@@ -1,6 +1,6 @@
 module github.com/dwardu89/namespace-reaper
 
-go 1.11
+go 1.13
 
 require (
 	github.com/imdario/mergo v0.3.9 // indirect
