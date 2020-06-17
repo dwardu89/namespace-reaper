@@ -18,4 +18,4 @@ jobs:
 
       - run: 
           name: Building image
-          command: make build
+          command: make all
