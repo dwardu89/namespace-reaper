@@ -7,6 +7,9 @@ all: deps build build-docker clean
 build:
 	@GOOS=linux GOARCH=amd64 go build -o bin/ ./cmd/namespace-reaper 
 
+build-arm:
+	@GOOS=linux GOARCH=arm64 go build -o bin/ ./cmd/namespace-reaper 
+
 build-docker: deps build
 	docker build . -t dwardu/namespace-reaper:$(VERSION)
 	docker build . -t dwardu/namespace-reaper:latest
